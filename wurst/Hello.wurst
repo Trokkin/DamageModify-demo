@@ -1,0 +1,40 @@
+package Hello
+import DamageModify
+import ClosureTimers
+import StandardTextTags
+import EventHelper
+
+unit Invincible = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((0).toPlayerColor())
+unit Unkillable = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((1).toPlayerColor())
+unit Undying = createUnit(players[0], 'Hpal', vec2(0,0), angle(0))
+unit Uberdamage = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((3).toPlayerColor())
+
+init
+	addTargetDamageModifier(Invincible) d ->
+		d.initial = 0
+		d.amount = 0
+
+	addTargetDamageModifier(Unkillable) d ->
+		d.saveTarget()
+
+	doPeriodically(1./32.) cb ->
+		Invincible.setHP(0.406)
+		Unkillable.setHP(0.406)
+
+	CreateTrigger()..registerDeathEvent(Undying).addAction() ->
+		doAfter(5) ->
+			ReviveHero(Undying, 0, 0, false)
+			Undying.setHP(Undying.getMaxHP())
+
+	addSourceDamageModifier(Uberdamage) d ->
+		d.amount *= 20
+		
+	addSourceDamageListener(Uberdamage) d ->
+		d.source.addHP(d.amount)
+		createLumberBountyTextTag(d.source, d.amount.toInt())
+		
+
+	addDamageListener() d ->
+		standardTextTag(d.target.getPos(), d.amount.toString())
+			..setColor(d.source.getOwner().getColor().toColor().withAlpha(255))
+			..setVisibility(GetLocalPlayer() == d.target.getOwner() or GetLocalPlayer() == d.source.getOwner())			
