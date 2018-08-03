@@ -1,0 +1,129 @@
+package TestUnits
+import DamageModify
+import ClosureTimers
+import StandardTextTags
+import RegisterEvents
+import ChannelAbilityPreset
+import Assets
+
+constant UBERDAMAGE_ID = compiletime(UNIT_ID_GEN.next())
+constant MAGE_ID = compiletime(UNIT_ID_GEN.next())
+constant UBERMAGE_ID = compiletime(UNIT_ID_GEN.next())
+
+constant DEFEND_ID = compiletime(ABIL_ID_GEN.next())
+constant SPELLDAMAGE_ID = compiletime(ABIL_ID_GEN.next())
+constant PUREDAMAGE_ID = compiletime(ABIL_ID_GEN.next())
+
+/** This unit is immune to damage. */
+unit Invincible = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((0).toPlayerColor())..setName("Invincible")
+
+/** This unit can't be killed with damage, but is taking twice as much. For fun. */
+unit Unkillable = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((1).toPlayerColor())..setName("Unkillable")
+
+/** This unit will instantly ressurect with full HP if killed. */
+unit Undying = createUnit(players[0], 'Hpal', vec2(0,0), angle(0))..setName("Undying")
+
+init
+	// This unit deals a hell of a lot damage with each blow (unmodified by triggers)
+	createUnit(players[0], UBERDAMAGE_ID, vec2(0,0), angle(0))
+	// This unit deals a hell of a lot  damage with each blow (unmodified by triggers)
+	createUnit(players[0], MAGE_ID, vec2(0,0), angle(0))
+		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)
+	// This unit deals a hell of a lot spell damage with each blow (unmodified by triggers)
+	createUnit(players[0], UBERMAGE_ID, vec2(0,0), angle(0))
+		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)
+
+	addTargetDamageModifier(Invincible) d ->
+		d.amount = 0
+
+	addTargetDamageModifier(Unkillable) d ->
+		d.addMultiplier(2)
+		d.preventDeath()
+
+	CreateTrigger()..registerDeathEvent(Undying).addAction() ->
+		doAfter(5) ->
+			Undying.revive(Undying.getPos(), false)
+			Undying.setHP(Undying.getMaxHP())
+		
+	addDamageListener() d ->
+		d.source.addHP(d.amount)
+		if d.amount >= 1.
+			createLumberBountyTextTag(d.source, d.amount.toInt())
+
+	addDamageListener() d ->
+		standardTextTag(d.target.getPos(), d.amount.toString())
+			..setColor(d.source.getOwner().getColor().toColor().withAlpha(255))
+			..setVisibility(GetLocalPlayer() == d.target.getOwner() or GetLocalPlayer() == d.source.getOwner())
+
+
+ForDamageCallback physModifier = d -> begin
+		if not d.spell
+			d.amount = 0
+	end
+
+init
+	registerSpellEffectEvent(DEFEND_ID) ->
+		let target = GetSpellTargetUnit()
+		let eff = target.addEffect(Abilities.innerFireTarget, "overhead")
+		addTargetDamageModifier(target, physModifier)
+		doAfter(5) ->
+			removeTargetDamageModifier(target, physModifier)
+			eff.destr()
+
+	registerSpellEffectEvent(SPELLDAMAGE_ID) ->
+		GetSpellTargetUnit().addEffect(Abilities.dragonHawkMissile, "chest").destr()
+		new Damage(GetTriggerUnit(), GetSpellTargetUnit(), 50, true, SPELLDAMAGE_ID)..modify()..modify().deal()		
+
+	registerSpellEffectEvent(PUREDAMAGE_ID) ->
+		GetSpellTargetUnit().addEffect(Abilities.boltImpact, "chest").destr()
+		new Damage(GetTriggerUnit(), GetSpellTargetUnit(), 50, true, PUREDAMAGE_ID).deal()
+
+@compiletime function createObjects()
+	new UnitDefinition(UBERDAMAGE_ID, 'hfoo')
+		..setAttack1DamageBase(10000)
+		..setName("Powerful footman")
+
+	new UnitDefinition(MAGE_ID, 'hfoo')
+		..setAttack1AttackType(AttackType.Spells)
+		..setAttack1ProjectileArt(Abilities.farseerMissile)
+		..setName("Mage footman")
+		..setTintingColorGreen(0)
+		..setTintingColorRed(0)
+
+	new UnitDefinition(UBERMAGE_ID, 'hfoo')
+		..setAttack1AttackType(AttackType.Spells)
+		..setAttack1ProjectileArt(Abilities.farseerMissile)
+		..setName("Powerful mage footman")
+		..setAttack1DamageBase(10000)
+		..setTintingColorGreen(0)
+
+	new ChannelAbilityPreset(DEFEND_ID, 1, true)
+		..setTargetsAllowed(1, "vulnerable,invulnerable")
+		..setCastRange(1, 500)
+		..presetTargetTypes(Targettype.UNIT)
+		..makeUnitSpell(0, 1/8)
+		..presetTooltipNormal(l -> "Defend [D]")
+		..presetTooltipNormalExtended(l -> "Makes target unit invulnerable to physical damage for 5 seconds.")
+		..setIconNormal(Icons.bTNSpellBreakerMagicDefend)
+		..presetButtonPosNormal(0, 2)
+		..setHotkeyNormal("D")
+	new ChannelAbilityPreset(SPELLDAMAGE_ID, 1, true)
+		..setTargetsAllowed(1, "vulnerable,invulnerable")
+		..setCastRange(1, 500)
+		..presetTargetTypes(Targettype.UNIT)
+		..makeUnitSpell(0, 1/8)
+		..presetTooltipNormal(l -> "Damage spell [S]")
+		..presetTooltipNormalExtended(l -> "Damages target for 50 magic damage that benefits twice from damage modifiers.")
+		..setIconNormal(Icons.bTNManaBurn)
+		..presetButtonPosNormal(1, 2)
+		..setHotkeyNormal("S")
+	new ChannelAbilityPreset(PUREDAMAGE_ID, 1, true)
+		..setTargetsAllowed(1, "vulnerable,invulnerable")
+		..setCastRange(1, 500)
+		..presetTargetTypes(Targettype.UNIT)
+		..makeUnitSpell(0, 1/8)
+		..presetTooltipNormal(l -> "Pure damage spell [P]")
+		..presetTooltipNormalExtended(l -> "Damages target for 50 pure damage.")
+		..setIconNormal(Icons.bTNCorpseExplode)
+		..presetButtonPosNormal(2, 2)
+		..setHotkeyNormal("P")

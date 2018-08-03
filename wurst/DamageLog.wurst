@@ -1,0 +1,33 @@
+/*
+	This example package stores up to STORED_INSTANCES last damage events
+	and prints them up when host presses `ESC` button.
+*/
+package DamageLog
+import DamageModify
+
+// config //
+
+constant STORED_INSTANCES = 5
+
+// end of config //
+
+Damage array storedDamage
+int storedIndex
+
+init
+	addDamageListener() d ->
+		d.saveInstance()
+		if storedDamage[storedIndex] != null
+			storedDamage[storedIndex].releaseInstance()
+		storedDamage[storedIndex] = d
+		storedIndex += 1
+		if storedIndex > STORED_INSTANCES - 1
+			storedIndex = 0
+			
+	// Press `ESC` to see saved instances
+	CreateTrigger()..registerPlayerEvent(players[0], EVENT_PLAYER_END_CINEMATIC).addAction() ->
+		for i = 0 to STORED_INSTANCES - 1
+			let d = storedDamage[i]
+			Log.info("Damage #"+i.toString()+" was dealt by "+d.source.getName()+" to "+d.target.getName()+" in amount of "+d.amount.toString() + " (initial: " + d.initial.toString() + ")")
+			if d.isKillingBlow()
+				Log.info("And actually, that was a killing blow.")

@@ -14,16 +14,12 @@ import HashMap
 	for damageListeners .amount is set to actual difference in target's life
 	so damage won't be more than target's life if it has killed target (or it was saved)
 	(a unit has 10 hp, it takes 100 damage, for damageModifiers it's 100 damage
-	but for damageListeners it's 10 damage / 10 - .406 damage if .doSaveTarget == true)
+	but for damageListeners it's 10 damage / 10 - .406 damage if .doPreventDeath == true)
 
 	Changes to Damage instance made in listeners or after the damage event are not considered.
 
 	Examples:
 	
-	// Leech ability
-	constant LEECH_ID = compiletime(ABIL_ID_GEN.next())
-	constant LEECH_DAMAGE = compiletime(GetRandomInt(100, 200))
-
 	// Leech implementation #1
 	function onLeechEffect1()
 		let d = GetTriggerUnit().returnDamage(GetSpellTargetUnit(), LEECH_DAMAGE, true, 0)
@@ -48,8 +44,6 @@ import HashMap
 				d.source.addEffect(Abilities.vampiricAuraTarget, "origin").destr()
 
 	// Simple damage resistance buff
-	constant BUFF_ID = compiletime(ABIL_ID_GEN.next())
-	constant BUFF_DURATION = 5.0
 
 	function onBuffEffect()
 		let target = GetSpellTargetUnit()
@@ -105,6 +99,67 @@ public function addDamageListener(ForDamageCallback cb)
 public function removeDamageListener(ForDamageCallback cb)
 	damageListeners.remove(cb)
 
+
+let targetUniqueModifiers = new HashMap<unit, LinkedList<ForDamageCallback>>
+/** Much more effective way to run unit-unique damageModifiers */
+public function addTargetDamageModifier(unit u, ForDamageCallback cb)
+	if not targetUniqueModifiers.has(u)
+		targetUniqueModifiers.put(u, new LinkedList<ForDamageCallback>)
+	targetUniqueModifiers.get(u).add(cb)
+
+public function removeTargetDamageModifier(unit u, ForDamageCallback cb)
+	var list = targetUniqueModifiers.get(u)
+	if list != null
+		list.remove(cb)
+		if list.isEmpty()
+			targetUniqueModifiers.remove(u)
+			destroy list
+			
+let sourceUniqueModifiers = new HashMap<unit, LinkedList<ForDamageCallback>>
+/** Much more effective way to run unit-unique damageModifiers */
+public function addSourceDamageModifier(unit u, ForDamageCallback cb)
+	if not sourceUniqueModifiers.has(u)
+		sourceUniqueModifiers.put(u, new LinkedList<ForDamageCallback>)
+	sourceUniqueModifiers.get(u).add(cb)
+
+public function removeSourceDamageModifier(unit u, ForDamageCallback cb)
+	var list = sourceUniqueModifiers.get(u)
+	if list != null
+		list.remove(cb)
+		if list.isEmpty()
+			sourceUniqueModifiers.remove(u)
+			destroy list
+
+let targetUniqueListeners = new HashMap<unit, LinkedList<ForDamageCallback>>
+/** Much more effective way to run unit-unique damageListeners */
+public function addTargetDamageListener(unit u, ForDamageCallback cb)
+	if not targetUniqueListeners.has(u)
+		targetUniqueListeners.put(u, new LinkedList<ForDamageCallback>)
+	targetUniqueListeners.get(u).add(cb)
+
+public function removeTargetDamageListener(unit u, ForDamageCallback cb)
+	var list = targetUniqueListeners.get(u)
+	if list != null
+		list.remove(cb)
+		if list.isEmpty()
+			targetUniqueListeners.remove(u)
+			destroy list
+			
+let sourceUniqueListeners = new HashMap<unit, LinkedList<ForDamageCallback>>
+/** Th */
+public function addSourceDamageListener(unit u, ForDamageCallback cb)
+	if not sourceUniqueListeners.has(u)
+		sourceUniqueListeners.put(u, new LinkedList<ForDamageCallback>)
+	sourceUniqueListeners.get(u).add(cb)
+
+public function removeSourceDamageListener(unit u, ForDamageCallback cb)
+	var list = sourceUniqueListeners.get(u)
+	if list != null
+		list.remove(cb)
+		if list.isEmpty()
+			sourceUniqueListeners.remove(u)
+			destroy list
+
 // ConvertAttackType(7) is a hidden attack type with some unique properties.
 // For more information see "goo.gl/9k8tn".
 // Note that the values in the table at this link are outdated, but the principle still applies.
@@ -139,13 +194,21 @@ public class Damage
 	
 		"amount of damage" == "amount of HP to remove" */
 	real amount
+		
+	construct(unit source, unit target, real amount, bool isSpell, int id)
+		this.source = source
+		this.target = target
+		this.initial = amount
+		this.amount = amount
+		spell = isSpell
+		this.id = id
 
 	/** Call this if you want to save the target.
 		This means that target won't die from the damage,
 		no matter how big `amount` would be */
-	function saveTarget()
-		doSaveTarget = true
-	protected bool doSaveTarget = false
+	function preventDeath()
+		doPreventDeath = true
+	protected bool doPreventDeath = false
 
 	/** Returns true if the damage is going to kill or already have killed target */
 	function isKillingBlow() returns bool
@@ -175,8 +238,10 @@ public class Damage
 		if not fired
 			let temp = dealingInstance
 			dealingInstance = this
-			target.damageTarget(target, initial, spell ? ATTACK_TYPE_NORMAL : ATTACK_TYPE_CHAOS)
+			source.damageTarget(target, initial, spell ? ATTACK_TYPE_NORMAL : ATTACK_TYPE_CHAOS)
 			dealingInstance = temp
+			if not fired
+				Log.warn("Damage.deal() has failed to pass the instance!")
 		else
 			Log.warn("Damage.deal() called on already fired damage!")
 
@@ -203,20 +268,12 @@ public class Damage
 	ondestroy
 		if wantSave > 0
 			Log.error("Damage instance was unsafely destroyed! Use .releaseInstance() instead!")
-		
-	construct(unit source, unit target, real amount, bool isSpell, int id)
-		this.source = source
-		this.target = target
-		this.initial = amount
-		this.amount = amount
-		spell = isSpell
-		this.id = id
 
 	/** If the damage was already dealt */
 	private bool fired = false
 
 	/** Runs all damageListeners */
-	protected function anounce()
+	protected function notify()
 		for i in damageListeners
 			i.run(this)
 		fired = true
@@ -237,12 +294,16 @@ function handler() returns bool
 
 	let life = d.target.getHP()
 	d.killingBlow = life - .406 < d.amount
-	if d.killingBlow and d.doSaveTarget
-		d.killingBlow = false
-		d.amount = life - .406
+	if d.killingBlow 
+		if d.doPreventDeath
+			d.killingBlow = false
+			d.amount = life - .406
+		else
+			d.amount = life
+
 	BlzSetEventDamage(d.amount)
 	
-	d.anounce()
+	d.notify()
 
 	d.releaseInstance()
 	return false
@@ -258,75 +319,6 @@ init
 		..setEditorSuffix("(DamageType)")
 		..setItemAbility(false)
 		..setDamageReduction(1, 2.)
-
-let targetUniqueModifiers = new HashMap<unit, LinkedList<ForDamageCallback>>
-/** Much more effective way to run unit-unique damageModifiers */
-public function addTargetDamageModifier(unit u, ForDamageCallback cb)
-	var list = targetUniqueModifiers.get(u)
-	if list == null
-		list = new LinkedList<ForDamageCallback>
-		targetUniqueModifiers.put(u, list)
-	list.add(cb)
-
-public function removeTargetDamageModifier(unit u, ForDamageCallback cb)
-	var list = targetUniqueModifiers.get(u)
-	if list != null
-		list.remove(cb)
-		if list.isEmpty()
-			targetUniqueModifiers.remove(u)
-			destroy list
-			
-let sourceUniqueModifiers = new HashMap<unit, LinkedList<ForDamageCallback>>
-/** Much more effective way to run unit-unique damageModifiers */
-public function addSourceDamageModifier(unit u, ForDamageCallback cb)
-	var list = sourceUniqueModifiers.get(u)
-	if list == null
-		list = new LinkedList<ForDamageCallback>
-		sourceUniqueModifiers.put(u, list)
-	list.add(cb)
-
-public function removeSourceDamageModifier(unit u, ForDamageCallback cb)
-	var list = sourceUniqueModifiers.get(u)
-	if list != null
-		list.remove(cb)
-		if list.isEmpty()
-			sourceUniqueModifiers.remove(u)
-			destroy list
-
-let targetUniqueListeners = new HashMap<unit, LinkedList<ForDamageCallback>>
-/** Much more effective way to run unit-unique damageListeners */
-public function addTargetDamageListener(unit u, ForDamageCallback cb)
-	var list = targetUniqueListeners.get(u)
-	if list == null
-		list = new LinkedList<ForDamageCallback>
-		targetUniqueListeners.put(u, list)
-	list.add(cb)
-
-public function removeTargetDamageListener(unit u, ForDamageCallback cb)
-	var list = targetUniqueListeners.get(u)
-	if list != null
-		list.remove(cb)
-		if list.isEmpty()
-			targetUniqueListeners.remove(u)
-			destroy list
-			
-let sourceUniqueListeners = new HashMap<unit, LinkedList<ForDamageCallback>>
-/** Much more effective way to run unit-unique damageListeners */
-public function addSourceDamageListener(unit u, ForDamageCallback cb)
-	var list = sourceUniqueListeners.get(u)
-	if list == null
-		list = new LinkedList<ForDamageCallback>
-		sourceUniqueListeners.put(u, list)
-	list.add(cb)
-
-public function removeSourceDamageListener(unit u, ForDamageCallback cb)
-	var list = sourceUniqueListeners.get(u)
-	if list != null
-		list.remove(cb)
-		if list.isEmpty()
-			sourceUniqueListeners.remove(u)
-			destroy list
-
 
 init
 	addDamageModifier() d ->
