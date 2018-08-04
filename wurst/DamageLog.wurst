@@ -7,7 +7,7 @@ import DamageModify
 
 // config //
 
-constant STORED_INSTANCES = 5
+constant STORED_INSTANCES = 16
 
 // end of config //
 
@@ -28,6 +28,5 @@ init
 	CreateTrigger()..registerPlayerEvent(players[0], EVENT_PLAYER_END_CINEMATIC).addAction() ->
 		for i = 0 to STORED_INSTANCES - 1
 			let d = storedDamage[i]
-			Log.info("Damage #"+i.toString()+" was dealt by "+d.source.getName()+" to "+d.target.getName()+" in amount of "+d.amount.toString() + " (initial: " + d.initial.toString() + ")")
-			if d.isKillingBlow()
-				Log.info("And actually, that was a killing blow.")
+			if d != null
+				Log.info("Damage #"+i.toString()+" was dealt by "+d.source.getName()+" to "+d.target.getName()+" in amount of "+d.amount.toString() + " (initial: " + d.initial.toString() + ", killing blow: "+d.isKillingBlow().toString()+", spell: "+d.spell.toString()+")")

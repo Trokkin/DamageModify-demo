@@ -25,13 +25,15 @@ unit Undying = createUnit(players[0], 'Hpal', vec2(0,0), angle(0))..setName("Und
 
 init
 	// This unit deals a hell of a lot damage with each blow (unmodified by triggers)
-	createUnit(players[0], UBERDAMAGE_ID, vec2(0,0), angle(0))
-	// This unit deals a hell of a lot  damage with each blow (unmodified by triggers)
+	createUnit(players[0], UBERDAMAGE_ID, vec2(0,0), angle(0))..setColor((2).toPlayerColor())
+
+	// This unit deals a spell damage with each blow (unmodified by triggers)
 	createUnit(players[0], MAGE_ID, vec2(0,0), angle(0))
-		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)
+		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)..removeAbility(AbilityIds.defend)
+
 	// This unit deals a hell of a lot spell damage with each blow (unmodified by triggers)
 	createUnit(players[0], UBERMAGE_ID, vec2(0,0), angle(0))
-		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)
+		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)..removeAbility(AbilityIds.defend)
 
 	addTargetDamageModifier(Invincible) d ->
 		d.amount = 0
@@ -107,23 +109,25 @@ init
 		..setIconNormal(Icons.bTNSpellBreakerMagicDefend)
 		..presetButtonPosNormal(0, 2)
 		..setHotkeyNormal("D")
+
 	new ChannelAbilityPreset(SPELLDAMAGE_ID, 1, true)
 		..setTargetsAllowed(1, "vulnerable,invulnerable")
 		..setCastRange(1, 500)
 		..presetTargetTypes(Targettype.UNIT)
 		..makeUnitSpell(0, 1/8)
-		..presetTooltipNormal(l -> "Damage spell [S]")
+		..presetTooltipNormal(l -> "Damage spell [E]")
 		..presetTooltipNormalExtended(l -> "Damages target for 50 magic damage that benefits twice from damage modifiers.")
 		..setIconNormal(Icons.bTNManaBurn)
 		..presetButtonPosNormal(1, 2)
-		..setHotkeyNormal("S")
+		..setHotkeyNormal("E")
+
 	new ChannelAbilityPreset(PUREDAMAGE_ID, 1, true)
 		..setTargetsAllowed(1, "vulnerable,invulnerable")
 		..setCastRange(1, 500)
 		..presetTargetTypes(Targettype.UNIT)
 		..makeUnitSpell(0, 1/8)
-		..presetTooltipNormal(l -> "Pure damage spell [P]")
+		..presetTooltipNormal(l -> "Pure damage spell [R]")
 		..presetTooltipNormalExtended(l -> "Damages target for 50 pure damage.")
 		..setIconNormal(Icons.bTNCorpseExplode)
 		..presetButtonPosNormal(2, 2)
-		..setHotkeyNormal("P")
+		..setHotkeyNormal("R")

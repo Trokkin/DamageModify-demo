@@ -99,7 +99,6 @@ public function addDamageListener(ForDamageCallback cb)
 public function removeDamageListener(ForDamageCallback cb)
 	damageListeners.remove(cb)
 
-
 let targetUniqueModifiers = new HashMap<unit, LinkedList<ForDamageCallback>>
 /** Much more effective way to run unit-unique damageModifiers */
 public function addTargetDamageModifier(unit u, ForDamageCallback cb)
@@ -286,10 +285,9 @@ function handler() returns bool
 	var d = Damage.dealingInstance
 	if d == null or d.source != GetEventDamageSource() or d.target != GetTriggerUnit() or damage < 0 != d.spell
 		d = new Damage(GetEventDamageSource(), GetTriggerUnit(), (damage < 0 ? -damage : damage), damage < 0, DAMAGE_ID_NONTRIGGERED)
-		d.modify()
+		d.modify() // So basically all non-triggered damage is modified once
 	else
-		d.amount = (damage < 0 ? -damage : damage)
-		Damage.dealingInstance = null
+		Damage.dealingInstance = null // let no one else retrieve the same instance
 	d.saveInstance()
 
 	let life = d.target.getHP()
