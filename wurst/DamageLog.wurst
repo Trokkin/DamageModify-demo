@@ -26,7 +26,20 @@ init
 			
 	// Press `ESC` to see saved instances
 	CreateTrigger()..registerPlayerEvent(players[0], EVENT_PLAYER_END_CINEMATIC).addAction() ->
+		var x = storedIndex
 		for i = 0 to STORED_INSTANCES - 1
-			let d = storedDamage[i]
+			let d = storedDamage[x]
 			if d != null
-				Log.info("Damage #"+i.toString()+" was dealt by "+d.source.getName()+" to "+d.target.getName()+" in amount of "+d.amount.toString() + " (initial: " + d.initial.toString() + ", killing blow: "+d.isKillingBlow().toString()+", spell: "+d.spell.toString()+")")
+				var s = "Damage #"+i.toString()
+				s += " was dealt by "+d.source.getName()
+				s += " to "+d.target.getName()
+				s += " in amount of "+d.getActual().toString()
+				s += " (intended: "+d.amount.toString()
+				s += ", initial: " + d.initial.toString()
+				s += ", killing blow: "+d.isKillingBlow().toString()
+				s += ", spell damage: "+d.spell.toString()
+				s += ")"
+				Log.info(s)
+			x += 1
+			if x > STORED_INSTANCES - 1
+				x = 0
