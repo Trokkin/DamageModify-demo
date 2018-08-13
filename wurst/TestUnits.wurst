@@ -36,7 +36,7 @@ init
 		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)..removeAbility(AbilityIds.defend)
 
 	addTargetDamageModifier(Invincible) d ->
-		d.amount = 0
+		d.deflect()
 
 	addTargetDamageModifier(Unkillable) d ->
 		d.addMultiplier(2)
@@ -48,19 +48,21 @@ init
 			Undying.setHP(Undying.getMaxHP())
 		
 	addDamageListener() d ->
-		d.source.addHP(d.amount)
-		if d.amount >= 1.
-			createLumberBountyTextTag(d.source, d.amount.toInt())
+		d.source.addHP(d.getActual())
+		createLumberBountyTextTag(d.source, d.getActual().toInt())
 
 	addDamageListener() d ->
-		standardTextTag(d.target.getPos(), d.amount.toString())
+		standardTextTag(d.target.getPos(), d.getActual().toString())
 			..setColor(d.source.getOwner().getColor().toColor().withAlpha(255))
 			..setVisibility(GetLocalPlayer() == d.target.getOwner() or GetLocalPlayer() == d.source.getOwner())
 
+	registerPlayerUnitEvent(EVENT_PLAYER_UNIT_DEATH) ->
+		Log.info(GetTriggerUnit().getName() + " was killed by " + GetKillingUnit().getName() + "!")
 
-ForDamageCallback physModifier = d -> begin
+
+DamageModifier physModifier = d -> begin
 		if not d.spell
-			d.amount = 0
+			d.deflect()
 	end
 
 init
