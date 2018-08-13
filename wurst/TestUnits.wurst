@@ -20,6 +20,9 @@ unit Invincible = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor(
 /** This unit can't be killed with damage, but is taking twice as much. For fun. */
 unit Unkillable = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((1).toPlayerColor())..setName("Unkillable")
 
+/** When this unit is damaged, it also damages source with same force. */
+unit Spiked = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((3).toPlayerColor())..setName("Spiked")
+
 /** This unit will instantly ressurect with full HP if killed. */
 unit Undying = createUnit(players[0], 'Hpal', vec2(0,0), angle(0))..setName("Undying")
 
@@ -50,6 +53,11 @@ init
 	addDamageListener() d ->
 		d.source.addHP(d.getActual())
 		createLumberBountyTextTag(d.source, d.getActual().toInt())
+
+	addTargetDamageListener(Spiked) d ->
+		let d2 = d.target.returnDamage(d.source, d.initial, d.spell, 0)
+		Log.info("Reflected " + d2.initial.toString() + " into " + d2.getActual().toString())
+		// Actually mimics current Dota 2's blademail mechanics
 
 	addDamageListener() d ->
 		standardTextTag(d.target.getPos(), d.getActual().toString())
