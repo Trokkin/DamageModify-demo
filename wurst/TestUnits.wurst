@@ -1,5 +1,9 @@
 package TestUnits
+
 import DamageModify
+import UniqueDamageListening
+import DamageStack
+
 import ClosureTimers
 import StandardTextTags
 import RegisterEvents
@@ -15,18 +19,26 @@ constant SPELLDAMAGE_ID = compiletime(ABIL_ID_GEN.next())
 constant PUREDAMAGE_ID = compiletime(ABIL_ID_GEN.next())
 
 /** This unit is immune to damage. */
-unit Invincible = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((0).toPlayerColor())..setName("Invincible")
+unit invincible
 
 /** This unit can't be killed with damage, but is taking twice as much. For fun. */
-unit Unkillable = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((1).toPlayerColor())..setName("Unkillable")
+unit unkillable
 
 /** When this unit is damaged, it also damages source with same force. */
-unit Spiked = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((3).toPlayerColor())..setName("Spiked")
+unit spiked
 
 /** This unit will instantly ressurect with full HP if killed. */
-unit Undying = createUnit(players[0], 'Hpal', vec2(0,0), angle(0))..setName("Undying")
-
+unit undying
 init
+	doInit()
+
+function doInit()
+	Log.setLevel(Loglevel.TRACE)
+	invincible = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((0).toPlayerColor())..setName("invincible")
+	unkillable = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((1).toPlayerColor())..setName("Unkillable")
+	spiked = createUnit(players[0], 'hfoo', vec2(0,0), angle(0))..setColor((3).toPlayerColor())..setName("Spiked")
+	undying = createUnit(players[0], 'Hpal', vec2(0,0), angle(0))..setName("Undying")
+
 	// This unit deals a hell of a lot damage with each blow (unmodified by triggers)
 	createUnit(players[0], UBERDAMAGE_ID, vec2(0,0), angle(0))..setColor((2).toPlayerColor())
 
@@ -38,26 +50,27 @@ init
 	createUnit(players[0], UBERMAGE_ID, vec2(0,0), angle(0))
 		..addAbility(DEFEND_ID)..addAbility(SPELLDAMAGE_ID)..addAbility(PUREDAMAGE_ID)..removeAbility(AbilityIds.defend)
 
-	addTargetDamageModifier(Invincible) d ->
+	addTargetDamageModifier(invincible) d ->
 		d.deflect()
 
-	addTargetDamageModifier(Unkillable) d ->
+	addTargetDamageModifier(unkillable) d ->
 		d.addMultiplier(2)
 		d.preventDeath()
 
-	CreateTrigger()..registerDeathEvent(Undying).addAction() ->
+	CreateTrigger()..registerDeathEvent(undying).addAction() ->
 		doAfter(5) ->
-			Undying.revive(Undying.getPos(), false)
-			Undying.setHP(Undying.getMaxHP())
+			undying.revive(undying.getPos(), false)
+			undying.setHP(undying.getMaxHP())
 		
 	addDamageListener() d ->
 		d.source.addHP(d.getActual())
 		createLumberBountyTextTag(d.source, d.getActual().toInt())
 
-	addTargetDamageListener(Spiked) d ->
-		let d2 = d.target.returnDamage(d.source, d.initial, d.spell, 0)
+	addTargetDamageListener(spiked) d ->
+		let d2 = d.target.damageTarget(d.source, d.initial, d.attack, d.ranged, d.attackType, d.damageType, d.weaponType, 0)
 		Log.info("Reflected " + d2.initial.toString() + " into " + d2.getActual().toString())
-		// Actually mimics current Dota 2's blademail mechanics
+		d2.releaseInstance()
+		// Actually mimics current Dota 2's blademail mechanics, completely
 
 	addDamageListener() d ->
 		standardTextTag(d.target.getPos(), d.getActual().toString())
@@ -67,9 +80,15 @@ init
 	registerPlayerUnitEvent(EVENT_PLAYER_UNIT_DEATH) ->
 		Log.info(GetTriggerUnit().getName() + " was killed by " + GetKillingUnit().getName() + "!")
 
+	addDamageModifier() d ->
+		Log.info("End modifying of damage #" + (d castTo int).toString())
+	addDamageListener() d ->
+		Log.info("End listening of damage #" + (d castTo int).toString())
+		Log.info("")
+
 
 DamageModifier physModifier = d -> begin
-		if not d.spell
+		if not d.isSpell()
 			d.deflect()
 	end
 
@@ -84,11 +103,11 @@ init
 
 	registerSpellEffectEvent(SPELLDAMAGE_ID) ->
 		GetSpellTargetUnit().addEffect(Abilities.dragonHawkMissile, "chest").destr()
-		new Damage(GetTriggerUnit(), GetSpellTargetUnit(), 50, true, SPELLDAMAGE_ID)..modify()..modify().deal()		
+		new Damage(GetTriggerUnit(), GetSpellTargetUnit(), 50, false, false, ATTACK_TYPE_NORMAL, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS, SPELLDAMAGE_ID)..modify()..modify().deal()		
 
 	registerSpellEffectEvent(PUREDAMAGE_ID) ->
 		GetSpellTargetUnit().addEffect(Abilities.boltImpact, "chest").destr()
-		new Damage(GetTriggerUnit(), GetSpellTargetUnit(), 50, true, PUREDAMAGE_ID).deal()
+		new Damage(GetTriggerUnit(), GetSpellTargetUnit(), 50, false, false, ATTACK_TYPE_NORMAL, DAMAGE_TYPE_UNIVERSAL, WEAPON_TYPE_WHOKNOWS, PUREDAMAGE_ID).deal()
 
 @compiletime function createObjects()
 	new UnitDefinition(UBERDAMAGE_ID, 'hfoo')

@@ -1,6 +1,6 @@
 /*
-	This example package stores up to STORED_INSTANCES last damage events
-	and prints them up when host presses `ESC` button.
+	This example of .save/releaseInstance feature package usage stores up to
+	STORED_INSTANCES last damage events and prints them up when host presses `ESC` button.
 */
 package DamageLog
 import DamageModify
@@ -16,10 +16,9 @@ int storedIndex
 
 init
 	addDamageListener() d ->
-		d.saveInstance()
 		if storedDamage[storedIndex] != null
 			storedDamage[storedIndex].releaseInstance()
-		storedDamage[storedIndex] = d
+		storedDamage[storedIndex] = d..saveInstance()
 		storedIndex += 1
 		if storedIndex > STORED_INSTANCES - 1
 			storedIndex = 0
@@ -30,14 +29,15 @@ init
 		for i = 0 to STORED_INSTANCES - 1
 			let d = storedDamage[x]
 			if d != null
-				var s = "Damage #"+i.toString()
+				var s = "Damage #"+(d castTo int).toString()
+				s += " of id "+d.data.toString()
 				s += " was dealt by "+d.source.getName()
 				s += " to "+d.target.getName()
 				s += " in amount of "+d.getActual().toString()
 				s += " (intended: "+d.amount.toString()
 				s += ", initial: " + d.initial.toString()
+				s += ", spell: " + d.isSpell().toString()
 				s += ", killing blow: "+d.isKillingBlow().toString()
-				s += ", spell damage: "+d.spell.toString()
 				s += ")"
 				Log.info(s)
 			x += 1
